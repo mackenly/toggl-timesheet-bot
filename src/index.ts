@@ -120,7 +120,8 @@ export default {
 		const allClientIds = allProjects[0].clients.map((client: any) => client.client.id);
 		console.log(`All Client IDs: ${allClientIds}`);
 		console.log(`Client ID: ${clientId}`);
-		let html;
+		let html = await createHtml(allProjects, me, startDate, endDate, clientId, env);
+		//let html;
 		/*const browser = await puppeteer.launch(env.MYBROWSER);
 
 		allClientIds.forEach(async (id: number) => {
