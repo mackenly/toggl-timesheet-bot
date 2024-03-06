@@ -35,8 +35,14 @@ export async function getMe(env: Env): Promise<any> {
  * @param env Environment variables
  * @returns Toggl response with time entries
  */
-export async function getEntries(startDate: Date, endDate: Date, env: Env): Promise<any> {
-    const timeEntries: any = await fetch("https://api.track.toggl.com/api/v9/me/time_entries", {
+export async function getEntries(startDate: Date, endDate: Date, env: Env, options?: any): Promise<any> {
+    let query = "?";
+    query += new URLSearchParams({
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        ...options
+    }).toString();
+    const timeEntries: any = await fetch("https://api.track.toggl.com/api/v9/me/time_entries" + query, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",

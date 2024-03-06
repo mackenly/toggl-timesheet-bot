@@ -5,6 +5,7 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev --remote",
+    "dev:local": "wrangler dev",
     "start": "wrangler dev --remote"
   },
   "devDependencies": {
