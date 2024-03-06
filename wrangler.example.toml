@@ -1,0 +1,29 @@
+name = "toggl-timesheet-bot"
+main = "src/index.ts"
+compatibility_date = "2024-01-29"
+compatibility_flags = [ "nodejs_compat" ]
+
+# Browser Rendering API binding
+browser = { binding = "MYBROWSER" }
+
+[vars]
+ONLY_WORKSPACE = ""
+
+# hourly rate to use in calculations
+HOURLY_RATE = "100"
+
+# your phone number
+YOUR_PHONE = "123-456-7890"
+
+# your address
+YOUR_ADDRESS = "123 Easy St, Somewhere, USA"
+
+# Cron Triggers
+[triggers]
+crons = ["0 23 * * 5"] # run every Friday at 11pm UTC
+
+# Bind an R2 Bucket
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "toggl-timesheet-bot-pdfs"
+preview_bucket_name = "toggl-timesheet-bot-pdfs-test"
