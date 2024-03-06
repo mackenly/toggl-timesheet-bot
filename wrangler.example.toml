@@ -20,7 +20,7 @@ YOUR_ADDRESS = "123 Easy St, Somewhere, USA"
 
 # Cron Triggers
 [triggers]
-crons = ["0 23 * * 5"] # run every Friday at 11pm UTC
+crons = ["0 23 * * 6"] # run every Friday at 11pm UTC
 
 # Bind an R2 Bucket
 [[r2_buckets]]
