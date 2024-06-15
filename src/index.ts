@@ -183,6 +183,7 @@ async function getTogglData(env: Env, startDate: Date, endDate: Date) {
 }
 
 async function createHtml(allProjects: any, me: any, startDate: Date, endDate: Date, clientId: number, env: Env) {
+	const workspace = allProjects[0].workspace;
 	// if a client Id is not present on workspace, throw an error
 	if (allProjects[0].clients.find((client: any) => client.client.id === clientId) === undefined) {
 		throw new Error('Client ID not found');
@@ -244,12 +245,12 @@ async function createHtml(allProjects: any, me: any, startDate: Date, endDate: D
 			</p>
 		</section>`;
 
-	const html = `<!DOCTYPE html><html lang='en'><head> <meta charset='UTF-8'> <meta http-equiv='X-UA-Compatible' content='IE=edge'> <meta name='viewport' content='width=device-width, initial-scale=1.0'> <title>${me.fullname
-		}'s Timesheet for ${startDate.getMonth() + 1}/${startDate.getDate()}/${startDate.getFullYear()} - ${endDate.getMonth() + 1
+	const html = `<!DOCTYPE html><html lang='en'><head> <meta charset='UTF-8'> <meta http-equiv='X-UA-Compatible' content='IE=edge'> <meta name='viewport' content='width=device-width, initial-scale=1.0'> <title>${workspace.name
+		} Timesheet for ${client.client.name} for ${startDate.getMonth() + 1}/${startDate.getDate()}/${startDate.getFullYear()} - ${endDate.getMonth() + 1
 		}/${endDate.getDate()}/${endDate.getFullYear()}</title></head><body> <style> 
 body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; max-width: 1080px; margin: 20px auto; } header { margin-bottom: 20px; } #meta { display: flex; justify-content: space-between; } h1 { font-size: 35px; margin-bottom: 10px; } p { margin: 0; } table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #ddd; padding: 8px; } tr:nth-child(even) { background-color: #f2f2f2; } tr:hover { background-color: #ddd; } 
 th { padding-top: 12px; padding-bottom: 12px; text-align: left; background-color: #4CAF50; color: white; } #totals { margin-top: 20px; font-size: 16px; max-width: fit-content; margin-left: auto; padding: 10px; border: 1px solid rgb(192, 192, 192); } #totals p { margin: 5px 0; display: flex; justify-content: space-between; } #totals p span { margin-left: 20px; } section { margin-top: 20px; } #options {position: fixed;bottom: 10px;left: 50%;transform: translateX(-50%);height: 30px;display: flex;justify-content: space-between;align-items: center;gap: 10px;padding: 15px;border-radius: 50px;background-color: #4CAF50;} #options button,#options a {padding: 10px;border-radius: 5px;text-decoration: none;border: 0px solid transparent;background-color: transparent;color: #4CAF50;font-size: 16px;cursor: pointer;} #options svg { fill: #fff; padding-top: 5px;border: 2px solid transparent; } #options button:hover svg,#options button:active svg,#options a:hover svg,#options a:active svg {box-shadow: 0 0 50px 2px #fff;border-radius: 18px;background-color: rgba(255, 255, 255, 0.278);} footer { margin-top: 20px; } /* print styles */ 
-@media print { a {  color: #000 !important;  text-decoration: none !important; } } </style> <header> <h1>${me.fullname} ${client.client.name
+@media print { a {  color: #000 !important;  text-decoration: none !important; } } </style> <header> <h1>${workspace.name} ${client.client.name
 		} Timesheet</h1> <div id='meta'> <div>  <p>  <b>Client: </b> <span>${client.client.name
 		}</span>  </p>  <p>  <b>Invoice Date: </b> <span>${new Date().toLocaleDateString('en-US', {
 			year: 'numeric',
@@ -257,10 +258,10 @@ th { padding-top: 12px; padding-bottom: 12px; text-align: left; background-color
 			day: 'numeric',
 		})}</span>  </p>  <p>  <b>Invoice Period: </b> <span>${startDate.getMonth() + 1}/${startDate.getDate()}/
 ${startDate.getFullYear()} - ${endDate.getMonth() + 1
-		}/${endDate.getDate()}/${endDate.getFullYear()}</span>  </p> </div> <div>  <p>  <b>Contractor: </b> <span>${me.fullname
+		}/${endDate.getDate()}/${endDate.getFullYear()}</span>  </p> </div> <div>  <p>  <b>Contractor: </b> <span>${workspace.name
 		}</span>  </p>  <p>  <b>Email: </b> <span>${me.email}</span>  </p>  <p>  <b> Phone: </b> <span>${env.YOUR_PHONE
 		}</span>  </p>  <p>  <b>Address: </b> <span>${env.YOUR_ADDRESS}</span>  </p> </div> </div> </header><section> 
-<table><tr> <th>Date</th> <th>Project/Task</th> <th>Start</th> <th>Stop</th> <th>Hours</th> <th>Rate</th> <th>Total</th> </tr>${tableRowsContent}</table></section>${totalsContent}<section> <p> <b>Notice: </b>This invoice is dynamically generated from Toggl data and may be incomplete. The hour totals listed are rounded from the actual time tracked (in milliseconds). The total hours may be slightly off as a result. However, the amount due is calculated 
+<table><tr> <th>Date</th> <th>Project/Task</th> <th>Start (UTC)</th> <th>Stop (UTC)</th> <th>Hours</th> <th>Rate</th> <th>Total</th> </tr>${tableRowsContent}</table></section>${totalsContent}<section> <p> <b>Notice: </b>This invoice is dynamically generated from Toggl data and may be incomplete. The hour totals listed are rounded from the actual time tracked (in milliseconds). The total hours may be slightly off as a result. However, the amount due is calculated 
 off the seconds recorded. Please contact ${me.fullname
 		} if you have any questions or require clarification on any item. Thanks! </p> </section> <div id="options"><button onclick="window.print();"><svg xmlns="http://www.w3.org/2000/svg" height="34" width="34" viewBox="0 0 48 48"><path d="M32.9 15.6V9H15.1v6.6h-3V6h23.8v9.6ZM7 18.6h34-28.9Zm29.95 4.75q.6 0 1.05-.45.45-.45.45-1.05 0-.6-.45-1.05-.45-.45-1.05-.45-.6 0-1.05.45-.45.45-.45 1.05 0 .6.45 1.05.45.45 1.05.45ZM32.9 39v-9.6H15.1V39Zm3 3H12.1v-8.8H4V20.9q0-2.25 1.525-3.775T9.3 15.6h29.4q2.25 0 3.775 1.525T44 20.9v12.3h-8.1ZM41 30.2v-9.3q0-1-.65-1.65-.65-.65-1.65-.65H9.3q-1 0-1.65.65Q7 19.9 7 20.9v9.3h5.1v-3.8h23.8v3.8Z" /></svg></button><span style="height: 30px; border-left: 2px solid #fff;"></span><a href="mailto:test@example.com"><svg xmlns="http://www.w3.org/2000/svg" height="34" width="34" viewBox="0 0 48 48"><path d="M7 40q-1.2 0-2.1-.9Q4 38.2 4 37V11q0-1.2.9-2.1Q5.8 8 7 8h34q1.2 0 2.1.9.9.9.9 2.1v26q0 1.2-.9 2.1-.9.9-2.1.9Zm17-15.1L7 13.75V37h34V13.75Zm0-3L40.8 11H7.25ZM7 13.75V11v26Z" /></svg></a></div></body></html>
 		`;
