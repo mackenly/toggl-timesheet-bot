@@ -9,9 +9,6 @@ browser = { binding = "MYBROWSER" }
 [vars]
 ONLY_WORKSPACE = ""
 
-# hourly rate to use in calculations
-HOURLY_RATE = "100"
-
 # your phone number
 YOUR_PHONE = "123-456-7890"
 
