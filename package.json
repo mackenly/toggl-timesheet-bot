@@ -9,9 +9,9 @@
     "start": "wrangler dev --remote"
   },
   "devDependencies": {
-    "@cloudflare/puppeteer": "^0.0.14",
-    "@cloudflare/workers-types": "^4.20250321.0",
+    "@cloudflare/puppeteer": "^0.0.15",
+    "@cloudflare/workers-types": "^4.20250327.0",
     "typescript": "^5.8.2",
-    "wrangler": "^4.4.0"
+    "wrangler": "^4.6.0"
   }
 }
