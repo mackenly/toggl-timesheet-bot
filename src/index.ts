@@ -1,6 +1,96 @@
 import { getEntries, getWorkspaces, getProjects, getClients, getMe } from "./toggl_methods";
 import puppeteer, { BrowserWorker } from "@cloudflare/puppeteer";
 
+// Rounding behavior types and functions
+type RoundingBehavior = 'none' | 'up_decimal' | 'up_minute' | 'up_5mins' | 'up_15mins' | 'up_30mins' | 'up_hour' | 'down_decimal' | 'down_5mins' | 'down_15mins' | 'down_30mins' | 'down_hour' | 'nearest_decimal' | 'nearest_minute' | 'nearest_5mins' | 'nearest_15mins' | 'nearest_30mins' | 'nearest_hour';
+
+function applyRounding(totalHours: number, behavior: RoundingBehavior): { rounded: number, wasRounded: boolean } {
+	const original = totalHours;
+	let rounded = totalHours;
+
+	switch (behavior) {
+		case 'none':
+			return { rounded: totalHours, wasRounded: false };
+		case 'up_decimal':
+			rounded = Math.ceil(totalHours * 100) / 100;
+			break;
+		case 'up_minute':
+			rounded = Math.ceil(totalHours * 60) / 60;
+			break;
+		case 'up_5mins':
+			rounded = Math.ceil(totalHours * 12) / 12; // 60/5 = 12
+			break;
+		case 'up_15mins':
+			rounded = Math.ceil(totalHours * 4) / 4; // 60/15 = 4
+			break;
+		case 'up_30mins':
+			rounded = Math.ceil(totalHours * 2) / 2; // 60/30 = 2
+			break;
+		case 'up_hour':
+			rounded = Math.ceil(totalHours);
+			break;
+		case 'down_decimal':
+			rounded = Math.floor(totalHours * 100) / 100;
+			break;
+		case 'down_5mins':
+			rounded = Math.floor(totalHours * 12) / 12;
+			break;
+		case 'down_15mins':
+			rounded = Math.floor(totalHours * 4) / 4;
+			break;
+		case 'down_30mins':
+			rounded = Math.floor(totalHours * 2) / 2;
+			break;		case 'down_hour':
+			rounded = Math.floor(totalHours);
+			break;
+		case 'nearest_decimal':
+			rounded = Math.round(totalHours * 100) / 100;
+			break;
+		case 'nearest_minute':
+			rounded = Math.round(totalHours * 60) / 60;
+			break;
+		case 'nearest_5mins':
+			rounded = Math.round(totalHours * 12) / 12; // 60/5 = 12
+			break;
+		case 'nearest_15mins':
+			rounded = Math.round(totalHours * 4) / 4; // 60/15 = 4
+			break;
+		case 'nearest_30mins':
+			rounded = Math.round(totalHours * 2) / 2; // 60/30 = 2
+			break;
+		case 'nearest_hour':
+			rounded = Math.round(totalHours);
+			break;
+		default:
+			return { rounded: totalHours, wasRounded: false };
+	}
+
+	return { rounded, wasRounded: Math.abs(original - rounded) > 0.001 };
+}
+
+function getRoundingBehaviorDescription(behavior: RoundingBehavior): string {
+	switch (behavior) {
+		case 'none': return 'No rounding applied';
+		case 'up_decimal': return 'Rounded up to two decimal places';
+		case 'up_minute': return 'Rounded up to the nearest minute';
+		case 'up_5mins': return 'Rounded up to the nearest 5 minutes';
+		case 'up_15mins': return 'Rounded up to the nearest 15 minutes';
+		case 'up_30mins': return 'Rounded up to the nearest 30 minutes';
+		case 'up_hour': return 'Rounded up to the nearest hour';
+		case 'down_decimal': return 'Rounded down to two decimal places';
+		case 'down_5mins': return 'Rounded down to the nearest 5 minutes';		case 'down_15mins': return 'Rounded down to the nearest 15 minutes';
+		case 'down_30mins': return 'Rounded down to the nearest 30 minutes';
+		case 'down_hour': return 'Rounded down to the nearest hour';
+		case 'nearest_decimal': return 'Rounded to the nearest two decimal places';
+		case 'nearest_minute': return 'Rounded to the nearest minute';
+		case 'nearest_5mins': return 'Rounded to the nearest 5 minutes';
+		case 'nearest_15mins': return 'Rounded to the nearest 15 minutes';
+		case 'nearest_30mins': return 'Rounded to the nearest 30 minutes';
+		case 'nearest_hour': return 'Rounded to the nearest hour';
+		default: return 'No rounding applied';
+	}
+}
+
 export interface Env {
 	BUCKET: R2Bucket; 
 	MYBROWSER: BrowserWorker;
@@ -216,9 +306,8 @@ export default {
 					document.getElementById('dueDateForm').addEventListener('submit', (e) => {
 						e.preventDefault();
 						const dueDate = document.getElementById('dueDate').value;
-						const daysDue = document.getElementById('daysDue').value;
-						if (dueDate !== '') {
-							window.location.href = \`/?clientId=${clientId}&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}&hourlyRate=${hourlyRate}&dueDate=\${dueDate.toISOString()}\`;
+						const daysDue = document.getElementById('daysDue').value;						if (dueDate !== '') {
+							window.location.href = \`/?clientId=${clientId}&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}&hourlyRate=${hourlyRate}&dueDate=\${dueDate}\`;
 							return;
 						}
 						if (daysDue !== '' || (daysDue === '' && dueDate === '')) {
@@ -234,17 +323,118 @@ export default {
 				headers: {
 					'Content-Type': 'text/html',
 				},
+			});		}
+		// total rounding behavior (default to none)
+		let totalRoundingBehavior: RoundingBehavior;
+		let itemRoundingBehavior: RoundingBehavior;
+		if (url.searchParams.has('totalRoundingBehavior') && url.searchParams.get('totalRoundingBehavior') !== '' && url.searchParams.has('itemRoundingBehavior') && url.searchParams.get('itemRoundingBehavior') !== '') {
+			totalRoundingBehavior = url.searchParams.get('totalRoundingBehavior') as RoundingBehavior;
+			itemRoundingBehavior = url.searchParams.get('itemRoundingBehavior') as RoundingBehavior;
+		} else {
+			const selectRoundingHtml = `
+			<!DOCTYPE html>
+			<html lang='en'>
+			<head>
+				<meta charset='UTF-8'>
+				<meta http-equiv='X-UA-Compatible' content='IE=edge'>
+				<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+				<title>Select Rounding Behaviors</title>
+				<style>
+					body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; max-width: 480px; margin: 20px auto; }
+					h1 { font-size: 35px; margin-bottom: 10px; }
+					h2 { font-size: 20px; margin-bottom: 10px; margin-top: 20px; }
+					form { display: flex; flex-direction: column; }
+					label { margin-bottom: 10px; font-weight: bold; }
+					select { padding: 10px; margin-bottom: 20px; }
+					button { padding: 10px; background-color: #4CAF50; color: white; cursor: pointer; }
+				</style>
+			</head>
+			<body>
+				<h1>Timesheet Rounding</h1>
+				<form action='/' method='get'>
+					<h2>Total Hours Rounding</h2>
+					<label for='totalRoundingBehavior'>Total Rounding Behavior:</label>
+					<select name='totalRoundingBehavior' id='totalRoundingBehavior'>
+						<option value='none'>None (Default)</option>
+						<optgroup label='Round Up'>
+							<option value='up_decimal'>Up: Two Decimal Places</option>
+							<option value='up_minute'>Up: Minute</option>
+							<option value='up_5mins'>Up: 5 Minutes</option>
+							<option value='up_15mins'>Up: 15 Minutes</option>
+							<option value='up_30mins'>Up: 30 Minutes</option>
+							<option value='up_hour'>Up: Hour</option>
+						</optgroup>
+						<optgroup label='Round Down'>
+							<option value='down_decimal'>Down: Two Decimal Places</option>
+							<option value='down_5mins'>Down: 5 Minutes</option>
+							<option value='down_15mins'>Down: 15 Minutes</option>
+							<option value='down_30mins'>Down: 30 Minutes</option>
+							<option value='down_hour'>Down: Hour</option>
+						</optgroup>
+						<optgroup label='Round Nearest'>
+							<option value='nearest_decimal'>Nearest: Two Decimal Places</option>
+							<option value='nearest_minute'>Nearest: Minute</option>
+							<option value='nearest_5mins'>Nearest: 5 Minutes</option>
+							<option value='nearest_15mins'>Nearest: 15 Minutes</option>
+							<option value='nearest_30mins'>Nearest: 30 Minutes</option>
+							<option value='nearest_hour'>Nearest: Hour</option>
+						</optgroup>
+					</select>
+					
+					<h2>Individual Item Rounding</h2>
+					<label for='itemRoundingBehavior'>Item Rounding Behavior:</label>
+					<select name='itemRoundingBehavior' id='itemRoundingBehavior'>
+						<option value='none'>None (Default)</option>
+						<optgroup label='Round Up'>
+							<option value='up_decimal'>Up: Two Decimal Places</option>
+							<option value='up_minute'>Up: Minute</option>
+							<option value='up_5mins'>Up: 5 Minutes</option>
+							<option value='up_15mins'>Up: 15 Minutes</option>
+							<option value='up_30mins'>Up: 30 Minutes</option>
+							<option value='up_hour'>Up: Hour</option>
+						</optgroup>
+						<optgroup label='Round Down'>
+							<option value='down_decimal'>Down: Two Decimal Places</option>
+							<option value='down_5mins'>Down: 5 Minutes</option>
+							<option value='down_15mins'>Down: 15 Minutes</option>
+							<option value='down_30mins'>Down: 30 Minutes</option>
+							<option value='down_hour'>Down: Hour</option>
+						</optgroup>
+						<optgroup label='Round Nearest'>
+							<option value='nearest_decimal'>Nearest: Two Decimal Places</option>
+							<option value='nearest_minute'>Nearest: Minute</option>
+							<option value='nearest_5mins'>Nearest: 5 Minutes</option>
+							<option value='nearest_15mins'>Nearest: 15 Minutes</option>
+							<option value='nearest_30mins'>Nearest: 30 Minutes</option>
+							<option value='nearest_hour'>Nearest: Hour</option>
+						</optgroup>
+					</select>
+					
+					<input type='hidden' name='clientId' value='${clientId}'>
+					<input type='hidden' name='startDate' value='${startDate.toISOString()}'>
+					<input type='hidden' name='endDate' value='${endDate.toISOString()}'>
+					<input type='hidden' name='hourlyRate' value='${hourlyRate}'>
+					<input type='hidden' name='dueDate' value='${dueDate}'>
+					<button type='submit'>Submit</button>
+				</form>
+			</body>
+			</html>`;
+			return new Response(selectRoundingHtml, {
+				status: 200,
+				headers: {
+					'Content-Type': 'text/html',
+				},
 			});
 		}
 
-		let html = await createHtml(allProjects, me, startDate, endDate, clientId, hourlyRate, dueDate, env);
+		let html = await createHtml(allProjects, me, startDate, endDate, clientId, hourlyRate, dueDate, totalRoundingBehavior, itemRoundingBehavior, env);
 		//let html;
 		/*const browser = await puppeteer.launch(env.MYBROWSER);
 
 		allClientIds.forEach(async (id: number) => {
 			try {
 				console.log(`Creating PDF for client ${id}`);
-				html = await createHtml(allProjects, me, startDate, endDate, id, env);
+				html = await createHtml(allProjects, me, startDate, endDate, id, hourlyRate, dueDate, totalRoundingBehavior, itemRoundingBehavior, env);
 				const page = await browser.newPage();
 				await page.setContent(html);
 				await page.waitForNetworkIdle();
@@ -299,17 +489,21 @@ async function getTogglData(env: Env, startDate: Date, endDate: Date) {
 	return allProjects;
 }
 
-async function createHtml(allProjects: any, me: any, startDate: Date, endDate: Date, clientId: number, hourlyRate: number, dueDate: string, env: Env) {
+async function createHtml(allProjects: any, me: any, startDate: Date, endDate: Date, clientId: number, hourlyRate: number, dueDate: string, totalRoundingBehavior: RoundingBehavior, itemRoundingBehavior: RoundingBehavior, env: Env) {
 	const workspace = allProjects[0].workspace;
 	// if a client Id is not present on workspace, throw an error
 	if (allProjects[0].clients.find((client: any) => client.client.id === clientId) === undefined) {
 		throw new Error('Client ID not found');
 	}
-	const client = allProjects[0].clients.find((client: any) => client.client.id === clientId);
-	// create rows for the table
+	const client = allProjects[0].clients.find((client: any) => client.client.id === clientId);	// create rows for the table
 	let tableRowsContent = '';
+	let itemsWereRounded = false;
 	client.projects.map((project: any) => {
 		project.entries.map((entry: any) => {
+			const rawItemHours = entry.duration / 3600;
+			const { rounded: roundedItemHours, wasRounded: itemWasRounded } = applyRounding(rawItemHours, itemRoundingBehavior);
+			if (itemWasRounded) itemsWereRounded = true;
+			
 			tableRowsContent += `
 			<tr>
 				<td>${new Date(entry.start).toLocaleDateString('en-US', {
@@ -329,21 +523,39 @@ async function createHtml(allProjects: any, me: any, startDate: Date, endDate: D
 				minute: '2-digit',
 				timeZone: 'America/New_York',
 			})}</td>
-				<td>${(entry.duration / 3600).toFixed(2)}</td>
+				<td>${itemWasRounded ? '~' : ''}${roundedItemHours.toFixed(2)}</td>
 				<td>$${hourlyRate.toFixed(2)}</td>
-				<td>$${((entry.duration / 3600) * hourlyRate).toFixed(2)}</td>
+				<td>$${(roundedItemHours * hourlyRate).toFixed(2)}</td>
 			</tr>`;
-		});
-	});
+		});	});	
+	// Calculate total hours - use rounded items if item rounding is applied, otherwise use raw totals
+	let totalHoursForCalculation: number;
+	if (itemRoundingBehavior !== 'none') {
+		// Sum up the rounded individual items
+		totalHoursForCalculation = client.projects.reduce((a: any, b: any) => {
+			return a + b.entries.reduce((c: any, d: any) => {
+				const rawItemHours = d.duration / 3600;
+				const { rounded: roundedItemHours } = applyRounding(rawItemHours, itemRoundingBehavior);
+				return c + roundedItemHours;
+			}, 0);
+		}, 0);
+	} else {
+		// Use raw total seconds converted to hours
+		const rawTotalSeconds = client.projects.reduce((a: any, b: any) => {
+			return a + b.entries.reduce((c: any, d: any) => c + d.duration, 0);
+		}, 0);
+		totalHoursForCalculation = rawTotalSeconds / 3600;
+	}
+	
+	// Apply total rounding behavior to the calculated total
+	const { rounded: roundedTotalHours, wasRounded: totalWasRounded } = applyRounding(totalHoursForCalculation, totalRoundingBehavior);
+	const roundedAmountDue = roundedTotalHours * hourlyRate;
 	let totalsContent = `
 		<section id='totals'> 
 			<p>
 				<b>Total Hours: </b> 
 				<span>
-					${(client.projects.reduce((a: any, b: any) => {
-		return a + b.entries.reduce((c: any, d: any) => c + d.duration, 0);
-	}, 0) / 3600).toFixed(2)
-		}
+					${(totalWasRounded || itemsWereRounded) ? '~' : ''}${roundedTotalHours.toFixed(2)}
 				</span>
 			</p>
 			<p>
@@ -355,12 +567,7 @@ async function createHtml(allProjects: any, me: any, startDate: Date, endDate: D
 			<p>
 				<b>Amount Due: </b>
 				<span>
-					$${((client.projects.reduce((a: any, b: any) => {
-			return a + b.entries.reduce((c: any, d: any) => c + d.duration, 0);
-		}, 0) /
-			3600) *
-			hourlyRate).toFixed(2)
-		}
+					$${roundedAmountDue.toFixed(2)}
 				</span>
 			</p>
 			<p>
@@ -369,7 +576,42 @@ async function createHtml(allProjects: any, me: any, startDate: Date, endDate: D
 					${dueDate}
 				</span>
 			</p>
-		</section>`;
+		</section>`;// Create notice text based on rounding behaviors
+	const totalRoundingDescription = getRoundingBehaviorDescription(totalRoundingBehavior);
+	const itemRoundingDescription = getRoundingBehaviorDescription(itemRoundingBehavior);
+	
+	// Base notice about dynamic generation
+	const baseNotice = "This invoice is dynamically generated from Toggl data and may be incomplete.";
+	
+	// Individual item rounding notice
+	let itemNotice = "";
+	if (itemRoundingBehavior !== 'none') {
+		itemNotice = ` Individual time entries have been ${itemRoundingDescription.toLowerCase()}.`;
+	} else {
+		itemNotice = " Individual time entries show the actual time tracked (in hours with two decimal precision).";
+	}
+	
+	// Total hours rounding notice
+	let totalNotice = "";
+	if (totalRoundingBehavior !== 'none') {
+		if (itemRoundingBehavior !== 'none') {
+			totalNotice = ` The total hours and amount due are calculated from the rounded individual entries, then ${totalRoundingDescription.toLowerCase()}.`;
+		} else {
+			totalNotice = ` The total hours and amount due have been ${totalRoundingDescription.toLowerCase()}.`;
+		}
+	} else {
+		if (itemRoundingBehavior !== 'none') {
+			totalNotice = " The total hours and amount due are calculated by summing the rounded individual entries.";
+		} else {
+			totalNotice = " The total hours and amount due are calculated from the actual time tracked (in seconds).";
+		}
+	}
+	
+	// Timezone and contact info
+	const timezoneNotice = " Timezones are in US EST (New York).";
+	const contactNotice = ` Please contact ${me.fullname} if you have any questions or require clarification on any item. Thanks!`;
+	
+	const fullNotice = baseNotice + itemNotice + totalNotice + timezoneNotice + contactNotice;
 
 	const html = `<!DOCTYPE html><html lang='en'><head> <meta charset='UTF-8'> <meta http-equiv='X-UA-Compatible' content='IE=edge'> <meta name='viewport' content='width=device-width, initial-scale=1.0'> <title>${workspace.name
 		} Timesheet for ${client.client.name} for ${startDate.getMonth() + 1}/${startDate.getDate()}/${startDate.getFullYear()} - ${endDate.getMonth() + 1
@@ -387,9 +629,7 @@ th { padding-top: 12px; padding-bottom: 12px; text-align: left; background-color
 		}/${endDate.getDate()}/${endDate.getFullYear()}</span>  </p> </div> <div>  <p>  <b>Contractor: </b> <span>${workspace.name
 		}</span>  </p>  <p>  <b>Email: </b> <span>${me.email}</span>  </p>  <p>  <b> Phone: </b> <span>${env.YOUR_PHONE
 		}</span>  </p>  <p>  <b>Address: </b> <span>${env.YOUR_ADDRESS}</span>  </p> </div> </div> </header><section> 
-<table><tr> <th>Date</th> <th>Project/Task</th> <th>Start</th> <th>Stop</th> <th>Hours</th> <th>Rate</th> <th>Total</th> </tr>${tableRowsContent}</table></section>${totalsContent}<section> <p> <b>Notice: </b>This invoice is dynamically generated from Toggl data and may be incomplete. The hour totals listed are rounded from the actual time tracked (in milliseconds). The total hours may be slightly off as a result. However, the amount due is calculated 
-off the seconds recorded. Timezones are in US EST (New York). Please contact ${me.fullname
-		} if you have any questions or require clarification on any item. Thanks! </p> </section> <div id="options"><button onclick="window.print();"><svg xmlns="http://www.w3.org/2000/svg" height="34" width="34" viewBox="0 0 48 48"><path d="M32.9 15.6V9H15.1v6.6h-3V6h23.8v9.6ZM7 18.6h34-28.9Zm29.95 4.75q.6 0 1.05-.45.45-.45.45-1.05 0-.6-.45-1.05-.45-.45-1.05-.45-.6 0-1.05.45-.45.45-.45 1.05 0 .6.45 1.05.45.45 1.05.45ZM32.9 39v-9.6H15.1V39Zm3 3H12.1v-8.8H4V20.9q0-2.25 1.525-3.775T9.3 15.6h29.4q2.25 0 3.775 1.525T44 20.9v12.3h-8.1ZM41 30.2v-9.3q0-1-.65-1.65-.65-.65-1.65-.65H9.3q-1 0-1.65.65Q7 19.9 7 20.9v9.3h5.1v-3.8h23.8v3.8Z" /></svg></button></div></body></html>
+<table><tr> <th>Date</th> <th>Project/Task</th> <th>Start</th> <th>Stop</th> <th>Hours</th> <th>Rate</th> <th>Total</th> </tr>${tableRowsContent}</table></section>${totalsContent}<section> <p> <b>Notice: </b>${fullNotice} </p> </section> <div id="options"><button onclick="window.print();"><svg xmlns="http://www.w3.org/2000/svg" height="34" width="34" viewBox="0 0 48 48"><path d="M32.9 15.6V9H15.1v6.6h-3V6h23.8v9.6ZM7 18.6h34-28.9Zm29.95 4.75q.6 0 1.05-.45.45-.45.45-1.05 0-.6-.45-1.05-.45-.45-1.05-.45-.6 0-1.05.45-.45.45-.45 1.05 0 .6.45 1.05.45.45 1.05.45ZM32.9 39v-9.6H15.1V39Zm3 3H12.1v-8.8H4V20.9q0-2.25 1.525-3.775T9.3 15.6h29.4q2.25 0 3.775 1.525T44 20.9v12.3h-8.1ZM41 30.2v-9.3q0-1-.65-1.65-.65-.65-1.65-.65H9.3q-1 0-1.65.65Q7 19.9 7 20.9v9.3h5.1v-3.8h23.8v3.8Z" /></svg></button></div></body></html>
 		<script>window.onbeforeprint = function() { document.getElementById('options').style.display = 'none'; }; window.onafterprint = function() { document.getElementById('options').style.display = 'flex'; }; </script>`;
 	return html;
 }

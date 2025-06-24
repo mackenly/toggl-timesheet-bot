@@ -6,7 +6,10 @@
     "deploy": "wrangler deploy",
     "dev": "wrangler dev --remote",
     "dev:local": "wrangler dev",
-    "start": "wrangler dev --remote"
+    "start": "wrangler dev --remote",
+    "type-check": "tsc --noEmit",
+    "build": "wrangler deploy --dry-run",
+    "test": "npm run type-check && npm run build"
   },
   "devDependencies": {
     "@cloudflare/puppeteer": "^1.0.2",
