@@ -550,12 +550,12 @@ async function createHtml(allProjects: any, me: any, startDate: Date, endDate: D
 	// Apply total rounding behavior to the calculated total
 	const { rounded: roundedTotalHours, wasRounded: totalWasRounded } = applyRounding(totalHoursForCalculation, totalRoundingBehavior);
 	const roundedAmountDue = roundedTotalHours * hourlyRate;
-		let totalsContent = `
+	let totalsContent = `
 		<section id='totals'> 
 			<p>
 				<b>Total Hours: </b> 
 				<span>
-					${totalWasRounded ? '~' : ''}${roundedTotalHours.toFixed(2)}
+					${(totalWasRounded || itemsWereRounded) ? '~' : ''}${roundedTotalHours.toFixed(2)}
 				</span>
 			</p>
 			<p>
@@ -576,7 +576,7 @@ async function createHtml(allProjects: any, me: any, startDate: Date, endDate: D
 					${dueDate}
 				</span>
 			</p>
-		</section>`;	// Create notice text based on rounding behaviors
+		</section>`;// Create notice text based on rounding behaviors
 	const totalRoundingDescription = getRoundingBehaviorDescription(totalRoundingBehavior);
 	const itemRoundingDescription = getRoundingBehaviorDescription(itemRoundingBehavior);
 	
