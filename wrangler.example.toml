@@ -24,3 +24,6 @@ crons = ["0 23 * * 6"] # run every Friday at 11pm UTC
 binding = "BUCKET"
 bucket_name = "toggl-timesheet-bot-pdfs"
 preview_bucket_name = "toggl-timesheet-bot-pdfs-test"
+
+[observability]
+enabled = true

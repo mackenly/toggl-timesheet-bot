@@ -27,6 +27,9 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
+    - name: Setup Wrangler configuration
+      run: cp wrangler.example.toml wrangler.toml
+
     - name: Run TypeScript type checking
       run: npm run type-check
 
