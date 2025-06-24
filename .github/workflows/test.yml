@@ -1,0 +1,59 @@
+name: Test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18, 20]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run TypeScript type checking
+      run: npm run type-check
+
+    - name: Test build (dry run)
+      run: npm run build
+      env:
+        # Add any required environment variables for wrangler here
+        # These are just placeholders and won't be used in dry-run mode
+        TOGGL_API_TOKEN: "dummy-token-for-build-test"
+        ONLY_WORKSPACE: ""
+        YOUR_PHONE: "123-456-7890"
+        YOUR_ADDRESS: "123 Easy St, Somewhere, USA"
+
+    - name: Check for formatting issues (if prettier is configured)
+      run: |
+        if [ -f ".prettierrc" ]; then
+          npx prettier --check .
+        else
+          echo "Prettier not configured, skipping format check"
+        fi
+      continue-on-error: true
+
+    - name: Lint check (if ESLint is configured)
+      run: |
+        if [ -f ".eslintrc.js" ] || [ -f ".eslintrc.json" ] || [ -f "eslint.config.js" ]; then
+          npx eslint . --ext .ts,.js
+        else
+          echo "ESLint not configured, skipping lint check"
+        fi
+      continue-on-error: true
