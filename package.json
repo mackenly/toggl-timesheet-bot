@@ -12,9 +12,9 @@
     "test": "npm run type-check && npm run build"
   },
   "devDependencies": {
-    "@cloudflare/puppeteer": "^1.0.2",
-    "@cloudflare/workers-types": "^4.20250620.0",
+    "@cloudflare/puppeteer": "^1.0.3",
+    "@cloudflare/workers-types": "^4.20250628.0",
     "typescript": "^5.8.3",
-    "wrangler": "^4.20.5"
+    "wrangler": "^4.22.0"
   }
 }
