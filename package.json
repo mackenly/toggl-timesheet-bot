@@ -13,8 +13,8 @@
   },
   "devDependencies": {
     "@cloudflare/puppeteer": "^1.0.5",
-    "@cloudflare/workers-types": "^4.20260124.0",
+    "@cloudflare/workers-types": "^4.20260131.0",
     "typescript": "^5.9.3",
-    "wrangler": "^4.60.0"
+    "wrangler": "^4.61.1"
   }
 }
